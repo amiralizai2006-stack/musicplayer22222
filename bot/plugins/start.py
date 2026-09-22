@@ -17,6 +17,10 @@ LOGGER = logging.getLogger("musicbot.start")
 _bot_username: Optional[str] = None
 
 
+# ==================================================================
+#                         اطلاعات ربات
+# ==================================================================
+
 async def bot_username(client: Client) -> str:
     global _bot_username
 
@@ -31,6 +35,27 @@ async def bot_username(client: Client) -> str:
         _bot_username = ""
 
     return _bot_username
+
+
+async def bot_profile_photo(client: Client):
+    """گرفتن file_id اولین عکس پروفایل ربات."""
+    try:
+        me = await client.get_me()
+
+        photos = []
+        async for photo in client.get_chat_photos(
+            me.id,
+            limit=1,
+        ):
+            photos.append(photo)
+
+        if photos:
+            return photos[0].file_id
+
+    except Exception as e:
+        LOGGER.debug("profile photo: %s", e)
+
+    return None
 
 
 async def add_group_url(client: Client) -> str:
@@ -55,21 +80,25 @@ async def pv_url(client: Client, payload: str = "") -> str:
 
 
 # ==================================================================
-#                            /start
+#                         متن اصلی /start
 # ==================================================================
 
 async def _start_user(
     client: Client,
 ) -> tuple[str, list, InlineKeyboardMarkup]:
 
-    t = ui.Text().title(
+    t = ui.Text()
+
+    # عنوان اصلی
+    t.title(
         ui.EMO_HEADPHONE,
         ui.BASE_HEADPHONE,
-        "موزیک‌پلیر فارسی",
+        "𝗦𝗜𝗟𝗘𝗡𝗧 𝗠𝗨𝗦𝗜𝗖 𝗣𝗟𝗔𝗬𝗘𝗥",
     )
 
     t.add(
-        "🎧 ربات پخش موزیک و ویدیو در ویس‌چت تلگرام\n\n"
+        "\n"
+        "🎧 ربات حرفه‌ای پخش موزیک و ویدیو در ویس‌چت\n\n"
     )
 
     t.line(
@@ -89,22 +118,27 @@ async def _start_user(
 
     t.emoji(
         ui.alt_arrow(3)
-    ).add(" ۴. برای پخش بنویس ")
+    ).add(
+        " ۴. برای پخش بنویس "
+    )
 
     t.code(
         "پخش اهنگ <اسم آهنگ>"
     )
 
-    t.add("\n\n")
+    t.add(
+        "\n\n"
+    )
 
     t.italic(
-        "برای شروع، ربات را به گروه اضافه کن."
+        "✨ آماده‌ای؟ ربات را به گروه اضافه کن و شروع کن."
     )
 
     add_url = await add_group_url(client)
 
     rows = []
 
+    # افزودن به گروه
     if add_url:
         rows.append([
             ui.btn(
@@ -116,6 +150,7 @@ async def _start_user(
             )
         ])
 
+    # راهنما + پشتیبانی
     rows.append([
         ui.btn(
             "🎧 راهنما",
@@ -139,14 +174,25 @@ async def _start_user(
     )
 
 
+# ==================================================================
+#                           پنل مالک
+# ==================================================================
+
 async def _start_owner(
     client: Client,
 ) -> tuple[str, list, InlineKeyboardMarkup]:
 
-    t = ui.Text().title(
+    t = ui.Text()
+
+    t.title(
         ui.EMO_GEAR,
         ui.BASE_ARROW,
-        "پنل مالک",
+        "𝗦𝗜𝗟𝗘𝗡𝗧 𝗠𝗨𝗦𝗜𝗖 𝗣𝗟𝗔𝗬𝗘𝗥",
+    )
+
+    t.add(
+        "\n"
+        "👑 پنل اختصاصی مالک ربات\n\n"
     )
 
     try:
@@ -160,10 +206,12 @@ async def _start_owner(
         f"{ui.fa(groups)} گروه",
     )
 
-    t.add("\n")
+    t.add(
+        "\n"
+    )
 
     t.italic(
-        "ربات آماده‌ی استفاده است."
+        "✨ ربات آماده‌ی استفاده است."
     )
 
     add_url = await add_group_url(client)
@@ -213,34 +261,49 @@ async def _start_owner(
     )
 
 
+# ==================================================================
+#                           /start گروه
+# ==================================================================
+
 async def _start_group(
     client: Client,
 ) -> tuple[str, list, InlineKeyboardMarkup]:
 
-    t = ui.Text().title(
+    t = ui.Text()
+
+    t.title(
         ui.EMO_HEADPHONE,
         ui.BASE_HEADPHONE,
-        "موزیک‌پلیر فارسی",
+        "𝗦𝗜𝗟𝗘𝗡𝗧 𝗠𝗨𝗦𝗜𝗖 𝗣𝗟𝗔𝗬𝗘𝗥",
+    )
+
+    t.add(
+        "\n"
+        "🎧 ربات پخش موزیک و ویدیو\n\n"
     )
 
     t.emoji(
         ui.alt_arrow(0)
-    ).add(" برای پخش بنویس : ")
+    ).add(
+        " برای پخش بنویس : "
+    )
 
     t.code(
         "پخش اهنگ <اسم>"
     )
 
-    t.add("\n")
+    t.add(
+        "\n\n"
+    )
 
     t.italic(
-        "ویس‌چت گروه باید روشن باشد."
+        "🎵 ویس‌چت گروه باید روشن باشد."
     )
 
     rows = [
         [
             ui.btn(
-                "راهنما",
+                "🎧 راهنما",
                 "h|main",
                 ui.PLAIN,
                 ui.EMO_LIST,
@@ -255,6 +318,10 @@ async def _start_group(
     )
 
 
+# ==================================================================
+#                             /start
+# ==================================================================
+
 @Client.on_message(filters.command("start"))
 async def start_cmd(
     client: Client,
@@ -266,9 +333,9 @@ async def start_cmd(
             message.from_user.id
         )
 
-    # -------------------------------
+    # --------------------------------------------------------------
     # GROUP
-    # -------------------------------
+    # --------------------------------------------------------------
 
     if message.chat.type.name != "PRIVATE":
 
@@ -288,9 +355,9 @@ async def start_cmd(
 
         return
 
-    # -------------------------------
+    # --------------------------------------------------------------
     # PRIVATE
-    # -------------------------------
+    # --------------------------------------------------------------
 
     uid = (
         message.from_user.id
@@ -298,20 +365,48 @@ async def start_cmd(
         else 0
     )
 
-    # مالک
+    # --------------------------------------------------------------
+    # ساخت متن
+    # --------------------------------------------------------------
+
     if uid == auth.OWNER_ID:
 
         text, ents, kb = await _start_owner(
             client
         )
 
-    # همه کاربران
     else:
 
         text, ents, kb = await _start_user(
             client
         )
 
+    # --------------------------------------------------------------
+    # عکس پروفایل خود ربات
+    # --------------------------------------------------------------
+
+    photo_id = await bot_profile_photo(
+        client
+    )
+
+    if photo_id:
+
+        try:
+            await message.reply_photo(
+                photo=photo_id,
+                caption=text,
+                caption_entities=ents,
+                reply_markup=kb,
+            )
+            return
+
+        except Exception as e:
+            LOGGER.warning(
+                "send profile photo failed: %s",
+                e,
+            )
+
+    # اگر عکس وجود نداشت
     await message.reply_text(
         text,
         entities=ents,
@@ -383,6 +478,10 @@ def _cmd(
     return t.add("\n")
 
 
+# ==================================================================
+#                           راهنمای اصلی
+# ==================================================================
+
 def _help_main() -> ui.Text:
 
     t = ui.Text().title(
@@ -401,7 +500,9 @@ def _help_main() -> ui.Text:
         "کنترل کامل با دکمه‌های پنل",
     )
 
-    t.add("\n")
+    t.add(
+        "\n"
+    )
 
     t.italic(
         "یکی از بخش‌ها را انتخاب کن:"
@@ -409,6 +510,10 @@ def _help_main() -> ui.Text:
 
     return t
 
+
+# ==================================================================
+#                           راهنمای آهنگ
+# ==================================================================
 
 def _help_song() -> ui.Text:
 
@@ -453,7 +558,9 @@ def _help_song() -> ui.Text:
         "روی فایل صوتی ریپلای کن و بنویس «پخش»",
     )
 
-    t.add("\n")
+    t.add(
+        "\n"
+    )
 
     t.italic(
         "چند آهنگ پشت‌سرهم بفرست تا صف بسازی."
@@ -461,6 +568,10 @@ def _help_song() -> ui.Text:
 
     return t
 
+
+# ==================================================================
+#                           راهنمای فیلم
+# ==================================================================
 
 def _help_movie() -> ui.Text:
 
@@ -491,7 +602,9 @@ def _help_movie() -> ui.Text:
         "روی ویدیو ریپلای کن و بنویس «پخش فیلم»",
     )
 
-    t.add("\n")
+    t.add(
+        "\n"
+    )
 
     t.italic(
         "فیلم صف ندارد؛ هر بار یک فیلم پخش می‌شود."
@@ -499,6 +612,10 @@ def _help_movie() -> ui.Text:
 
     return t
 
+
+# ==================================================================
+#                           کنترل پخش
+# ==================================================================
 
 def _help_control() -> ui.Text:
 
@@ -563,7 +680,9 @@ def _help_control() -> ui.Text:
         "پلتفرم",
     )
 
-    t.add("\n")
+    t.add(
+        "\n"
+    )
 
     t.italic(
         "همه‌ی این‌ها با دکمه‌های پنل هم انجام می‌شوند."
@@ -571,6 +690,10 @@ def _help_control() -> ui.Text:
 
     return t
 
+
+# ==================================================================
+#                           پنل و دکمه‌ها
+# ==================================================================
 
 def _help_panel() -> ui.Text:
 
@@ -659,6 +782,10 @@ def help_entities(node: str):
     return help_content(node)[1]
 
 
+# ==================================================================
+#                          دکمه‌های راهنما
+# ==================================================================
+
 def help_markup(
     node: str,
     support_url: Optional[str] = None,
@@ -676,13 +803,13 @@ def help_markup(
         rows = [
             [
                 ui.btn(
-                    "پخش آهنگ",
+                    "🎵 پخش آهنگ",
                     f"h|{HELP_SONG}",
                     ui.PLAIN,
                     ui.EMO_HEADPHONE,
                 ),
                 ui.btn(
-                    "پخش فیلم",
+                    "🎬 پخش فیلم",
                     f"h|{HELP_MOVIE}",
                     ui.PLAIN,
                     ui.EMO_MOVIE,
@@ -691,13 +818,13 @@ def help_markup(
 
             [
                 ui.btn(
-                    "کنترل پخش",
+                    "⚙️ کنترل پخش",
                     f"h|{HELP_CONTROL}",
                     ui.PLAIN,
                     ui.EMO_GEAR,
                 ),
                 ui.btn(
-                    "پنل و دکمه‌ها",
+                    "🎧 پنل و دکمه‌ها",
                     f"h|{HELP_PANEL}",
                     ui.PLAIN,
                     ui.EMO_LIST,
@@ -706,7 +833,7 @@ def help_markup(
 
             [
                 ui.btn(
-                    "پشتیبانی",
+                    "💬 پشتیبانی",
                     None,
                     ui.BLUE,
                     None,
@@ -716,7 +843,7 @@ def help_markup(
 
             [
                 ui.btn(
-                    "بستن راهنما",
+                    "❌ بستن راهنما",
                     "h|close",
                     ui.RED,
                     ui.EMO_CLOSE,
@@ -729,14 +856,14 @@ def help_markup(
         rows = [
             [
                 ui.btn(
-                    "بازگشت",
+                    "🔙 بازگشت",
                     f"h|{HELP_MAIN}",
                     ui.PLAIN,
                     ui.EMO_BACK,
                 ),
 
                 ui.btn(
-                    "بستن راهنما",
+                    "❌ بستن راهنما",
                     "h|close",
                     ui.RED,
                     ui.EMO_CLOSE,
@@ -746,6 +873,10 @@ def help_markup(
 
     return ui.kb(rows)
 
+
+# ==================================================================
+#                            فرمان راهنما
+# ==================================================================
 
 @Client.on_message(
     fa_command([
