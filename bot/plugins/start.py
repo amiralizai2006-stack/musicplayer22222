@@ -1,4 +1,5 @@
 """دستور /start، پنل راهنما و مدیریت دکمه‌های /start."""
+
 from __future__ import annotations
 
 import json
@@ -18,9 +19,11 @@ from bot import database as db
 from bot import ui
 from bot.facmd import fa_command
 
+
 LOGGER = logging.getLogger("musicbot.start")
 
 _bot_username: Optional[str] = None
+
 
 # ==================================================================
 #                         تنظیمات دکمه‌ها
@@ -28,7 +31,6 @@ _bot_username: Optional[str] = None
 
 BUTTONS_FILE = Path("start_buttons.json")
 
-# وضعیت موقت عملیات مالک
 _button_state: dict[int, str] = {}
 
 
@@ -72,10 +74,12 @@ def load_start_buttons() -> list[dict]:
             ):
                 continue
 
-            result.append({
-                "name": name,
-                "url": url,
-            })
+            result.append(
+                {
+                    "name": name,
+                    "url": url,
+                }
+            )
 
         return result
 
@@ -90,9 +94,14 @@ def load_start_buttons() -> list[dict]:
 def save_start_buttons(
     buttons: list[dict],
 ) -> bool:
-    """ذخیره دکمه‌ها."""
+    """ذخیره دائمی دکمه‌ها."""
 
     try:
+        BUTTONS_FILE.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
         BUTTONS_FILE.write_text(
             json.dumps(
                 buttons,
@@ -118,12 +127,20 @@ def add_start_button(
     url: str,
 ) -> bool:
 
+    name = name.strip()
+    url = url.strip()
+
+    if not name or not valid_button_url(url):
+        return False
+
     buttons = load_start_buttons()
 
-    buttons.append({
-        "name": name.strip(),
-        "url": url.strip(),
-    })
+    buttons.append(
+        {
+            "name": name,
+            "url": url,
+        }
+    )
 
     return save_start_buttons(buttons)
 
@@ -153,15 +170,23 @@ def update_start_button(
     if index < 0 or index >= len(buttons):
         return False
 
+    name = name.strip()
+    url = url.strip()
+
+    if not name or not valid_button_url(url):
+        return False
+
     buttons[index] = {
-        "name": name.strip(),
-        "url": url.strip(),
+        "name": name,
+        "url": url,
     }
 
     return save_start_buttons(buttons)
 
 
-def valid_button_url(url: str) -> bool:
+def valid_button_url(
+    url: str,
+) -> bool:
 
     url = url.strip()
 
@@ -206,7 +231,7 @@ async def bot_username(
 async def bot_profile_photo(
     client: Client,
 ):
-    """گرفتن عکس پروفایل خود ربات."""
+    """گرفتن عکس پروفایل ربات."""
 
     try:
         me = await client.get_me()
@@ -266,6 +291,44 @@ async def pv_url(
 
 
 # ==================================================================
+#                  دکمه‌های عمومی /start
+# ==================================================================
+
+def custom_start_button_rows(
+    buttons: list[dict],
+) -> list:
+
+    rows = []
+
+    for item in buttons:
+
+        name = str(
+            item.get("name", "")
+        ).strip()
+
+        url = str(
+            item.get("url", "")
+        ).strip()
+
+        if not name or not valid_button_url(url):
+            continue
+
+        rows.append(
+            [
+                ui.btn(
+                    name,
+                    None,
+                    ui.PLAIN,
+                    None,
+                    url=url,
+                )
+            ]
+        )
+
+    return rows
+
+
+# ==================================================================
 #                    ساخت دکمه‌های /start کاربران
 # ==================================================================
 
@@ -278,20 +341,14 @@ def user_start_markup(
     rows = []
 
     # --------------------------------------------------------------
-    # دکمه‌های اختصاصی ساخته‌شده توسط مالک
+    # دکمه‌های ساخته‌شده توسط مالک
     # --------------------------------------------------------------
 
-    for item in buttons:
-
-        rows.append([
-            ui.btn(
-                item["name"],
-                None,
-                ui.PLAIN,
-                None,
-                url=item["url"],
-            )
-        ])
+    rows.extend(
+        custom_start_button_rows(
+            buttons
+        )
+    )
 
     # --------------------------------------------------------------
     # افزودن به گروه
@@ -299,35 +356,39 @@ def user_start_markup(
 
     if add_url:
 
-        rows.append([
-            ui.btn(
-                "➕ افزودن به گروه",
-                None,
-                ui.GREEN,
-                None,
-                url=add_url,
-            )
-        ])
+        rows.append(
+            [
+                ui.btn(
+                    "➕ افزودن به گروه",
+                    None,
+                    ui.GREEN,
+                    None,
+                    url=add_url,
+                )
+            ]
+        )
 
     # --------------------------------------------------------------
     # راهنما + پشتیبانی
     # --------------------------------------------------------------
 
-    rows.append([
-        ui.btn(
-            "🎧 راهنما",
-            "h|main",
-            ui.PLAIN,
-            ui.EMO_LIST,
-        ),
-        ui.btn(
-            "💬 پشتیبانی",
-            None,
-            ui.PLAIN,
-            None,
-            url=support_url,
-        ),
-    ])
+    rows.append(
+        [
+            ui.btn(
+                "🎧 راهنما",
+                "h|main",
+                ui.PLAIN,
+                ui.EMO_LIST,
+            ),
+            ui.btn(
+                "💬 پشتیبانی",
+                None,
+                ui.PLAIN,
+                None,
+                url=support_url,
+            ),
+        ]
+    )
 
     return ui.kb(rows)
 
@@ -390,6 +451,10 @@ async def _start_user(
     t.italic(
         "✨ آماده‌ای؟ ربات را به گروه اضافه کن."
     )
+
+    # --------------------------------------------------------------
+    # هر بار /start اجرا شود، دکمه‌ها دوباره از فایل خوانده می‌شوند
+    # --------------------------------------------------------------
 
     buttons = load_start_buttons()
 
@@ -489,33 +554,37 @@ async def _start_owner(
 
     if add_url:
 
-        rows.append([
-            ui.btn(
-                "➕ افزودن به گروه",
-                None,
-                ui.GREEN,
-                None,
-                url=add_url,
-            )
-        ])
+        rows.append(
+            [
+                ui.btn(
+                    "➕ افزودن به گروه",
+                    None,
+                    ui.GREEN,
+                    None,
+                    url=add_url,
+                )
+            ]
+        )
 
-    rows.append([
-        ui.btn(
-            "🎧 راهنما",
-            "h|main",
-            ui.PLAIN,
-            ui.EMO_LIST,
-        ),
-        ui.btn(
-            "💬 پشتیبانی",
-            None,
-            ui.PLAIN,
-            None,
-            url=await auth.resolve_support_url(
-                client
+    rows.append(
+        [
+            ui.btn(
+                "🎧 راهنما",
+                "h|main",
+                ui.PLAIN,
+                ui.EMO_LIST,
             ),
-        ),
-    ])
+            ui.btn(
+                "💬 پشتیبانی",
+                None,
+                ui.PLAIN,
+                None,
+                url=await auth.resolve_support_url(
+                    client
+                ),
+            ),
+        ]
+    )
 
     return (
         t.text,
@@ -567,7 +636,18 @@ async def _start_group(
         "🎵 ویس‌چت گروه باید روشن باشد."
     )
 
-    rows = [
+    # --------------------------------------------------------------
+    # دکمه‌های ساخته‌شده توسط مالک
+    # در /start گروه هم نمایش داده می‌شوند
+    # --------------------------------------------------------------
+
+    buttons = load_start_buttons()
+
+    rows = custom_start_button_rows(
+        buttons
+    )
+
+    rows.append(
         [
             ui.btn(
                 "🎧 راهنما",
@@ -576,7 +656,7 @@ async def _start_group(
                 ui.EMO_LIST,
             )
         ]
-    ]
+    )
 
     return (
         t.text,
@@ -703,29 +783,33 @@ def buttons_manager_markup() -> InlineKeyboardMarkup:
 
     if buttons:
 
-        rows.append([
-            ui.btn(
-                "✏️ ویرایش دکمه",
-                "sb|edit",
-                ui.BLUE,
-                None,
-            ),
-            ui.btn(
-                "🗑 حذف دکمه",
-                "sb|delete",
-                ui.RED,
-                None,
-            ),
-        ])
-
-    rows.append([
-        ui.btn(
-            "🔙 بازگشت",
-            "sb|back",
-            ui.PLAIN,
-            ui.EMO_BACK,
+        rows.append(
+            [
+                ui.btn(
+                    "✏️ ویرایش دکمه",
+                    "sb|edit",
+                    ui.BLUE,
+                    None,
+                ),
+                ui.btn(
+                    "🗑 حذف دکمه",
+                    "sb|delete",
+                    ui.RED,
+                    None,
+                ),
+            ]
         )
-    ])
+
+    rows.append(
+        [
+            ui.btn(
+                "🔙 بازگشت",
+                "sb|back",
+                ui.PLAIN,
+                ui.EMO_BACK,
+            )
+        ]
+    )
 
     return ui.kb(rows)
 
@@ -847,23 +931,27 @@ async def show_delete_buttons(
         buttons
     ):
 
-        rows.append([
-            ui.btn(
-                f"🗑 {i + 1}. {item['name']}",
-                f"sb|del|{i}",
-                ui.RED,
-                None,
-            )
-        ])
-
-    rows.append([
-        ui.btn(
-            "🔙 بازگشت",
-            "sb|manage",
-            ui.PLAIN,
-            ui.EMO_BACK,
+        rows.append(
+            [
+                ui.btn(
+                    f"🗑 {i + 1}. {item['name']}",
+                    f"sb|del|{i}",
+                    ui.RED,
+                    None,
+                )
+            ]
         )
-    ])
+
+    rows.append(
+        [
+            ui.btn(
+                "🔙 بازگشت",
+                "sb|manage",
+                ui.PLAIN,
+                ui.EMO_BACK,
+            )
+        ]
+    )
 
     await query.answer()
 
@@ -904,8 +992,6 @@ async def delete_button_confirm(
         )
 
         return
-
-    name = buttons[index]["name"]
 
     if delete_start_button(index):
 
@@ -966,23 +1052,27 @@ async def show_edit_buttons(
         buttons
     ):
 
-        rows.append([
-            ui.btn(
-                f"✏️ {i + 1}. {item['name']}",
-                f"sb|edit|{i}",
-                ui.BLUE,
-                None,
-            )
-        ])
-
-    rows.append([
-        ui.btn(
-            "🔙 بازگشت",
-            "sb|manage",
-            ui.PLAIN,
-            ui.EMO_BACK,
+        rows.append(
+            [
+                ui.btn(
+                    f"✏️ {i + 1}. {item['name']}",
+                    f"sb|edit|{i}",
+                    ui.BLUE,
+                    None,
+                )
+            ]
         )
-    ])
+
+    rows.append(
+        [
+            ui.btn(
+                "🔙 بازگشت",
+                "sb|manage",
+                ui.PLAIN,
+                ui.EMO_BACK,
+            )
+        ]
+    )
 
     await query.answer()
 
@@ -1128,7 +1218,9 @@ async def start_button_messages(
             await message.reply_text(
                 "✅ دکمه با موفقیت اضافه شد.\n\n"
                 f"نام: {name}\n"
-                f"لینک: {url}"
+                f"لینک: {url}\n\n"
+                "👥 این دکمه از این به بعد در /start کاربران "
+                "و /start گروه‌ها نمایش داده می‌شود."
             )
 
         else:
@@ -1148,17 +1240,21 @@ async def start_button_messages(
     ):
 
         try:
+
             index = int(
                 state.split(
                     ":",
                     1,
                 )[1]
             )
+
         except Exception:
+
             _button_state.pop(
                 uid,
                 None,
             )
+
             return
 
         buttons = load_start_buttons()
@@ -1209,9 +1305,11 @@ async def start_button_messages(
             return
 
         try:
+
             index = int(
                 parts[1]
             )
+
         except Exception:
 
             _button_state.pop(
@@ -1371,10 +1469,13 @@ async def start_buttons_callback(
             return
 
         try:
+
             index = int(
                 parts[2]
             )
+
         except Exception:
+
             return
 
         await delete_button_confirm(
@@ -1385,7 +1486,7 @@ async def start_buttons_callback(
         return
 
     # --------------------------------------------------------------
-    # ویرایش لیست
+    # ویرایش
     # --------------------------------------------------------------
 
     if action == "edit":
@@ -1430,6 +1531,7 @@ HELP_SONG = "song"
 HELP_MOVIE = "movie"
 HELP_CONTROL = "control"
 HELP_PANEL = "panel"
+
 
 HELP_NODES = (
     HELP_MAIN,
@@ -1874,18 +1976,18 @@ def help_markup(
             ]
         ]
 
-    return ui.kb(
-        rows
-    )
+    return ui.kb(rows)
 
 
 @Client.on_message(
-    fa_command([
-        "راهنما پلیر",
-        "راهنما اهنگ",
-        "راهنما آهنگ",
-        "راهنما",
-    ])
+    fa_command(
+        [
+            "راهنما پلیر",
+            "راهنما اهنگ",
+            "راهنما آهنگ",
+            "راهنما",
+        ]
+    )
 )
 async def help_cmd(
     client: Client,
